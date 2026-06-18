@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>
+  // Set theme before first paint — avoids a flash of the wrong theme.
+  (function(){
+    var saved = localStorage.getItem("sparks-theme");
+    var theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  })();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Sparks — talk to a stranger</title>
+<meta name="description" content="Free anonymous text chat. No sign up, no login, no backend.">
+<meta name="theme-color" content="#0b0b0d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --radius-sm:10px; --radius-md:16px; --radius-lg:26px; --radius-pill:999px;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'Inter',system-ui,sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+    --accent:#ff8a3d;
+    --accent-text:#1a0f06;
+    --ease:cubic-bezier(.2,.7,.2,1);
+  }
+  [data-theme="dark"]{
+    --bg:#0b0b0d; --bg-elevated:#13131a; --surface:#15151c; --surface-2:#1d1d26;
+    --border:#26262f; --text:#f1eee8; --text-muted:#8d8d97;
+    --accent-soft:#3a2415; --accent-soft-text:#ffd9b8;
+    --success:#5fd97f; --danger:#f0566f;
+    --shadow:0 14px 36px rgba(0,0,0,.4); --overlay:rgba(7,7,9,.94);
+  }
+  [data-theme="light"]{
+    --bg:#faf8f3; --bg-elevated:#ffffff; --surface:#ffffff; --surface-2:#f2ede3;
+    --border:#e7e1d3; --text:#1c1b19; --text-muted:#79766f;
+    --accent-soft:#ffe2c4; --accent-soft-text:#7a3c10;
+    --success:#1f9d52; --danger:#d6334f;
+    --shadow:0 14px 36px rgba(30,20,5,.09); --overlay:rgba(250,248,243,.96);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--bg);color:var(--text);font-family:var(--font-body);
+    display:flex;flex-direction:column;min-height:100vh;-webkit-font-smoothing:antialiased;
+    transition:background-color .25s var(--ease),color .25s var(--ease);
+  }
+  a{color:var(--accent);text-decoration:none;}
+  button{font-family:inherit;}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px;}
+
+  /* ---------- GATE ---------- */
+  #gate{position:fixed;inset:0;background:var(--overlay);display:flex;align-items:center;
+    justify-content:center;z-index:100;padding:24px;backdrop-filter:blur(6px);}
+  #gate.hidden{display:none;}
+  .gate-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+    max-width:380px;padding:30px 26px;text-align:center;box-shadow:var(--shadow);}
+  .gate-card .mark{font-family:var(--font-display);font-weight:700;font-size:18px;margin-bottom:14px;}
+  .gate-card .mark span{color:var(--accent);}
+  .gate-card h2{font-family:var(--font-display);font-size:22px;margin:0 0 10px;letter-spacing:-.01em;}
+  .gate-card p{color:var(--text-muted);font-size:14px;line-height:1.55;margin:0 0 22px;}
+  .gate-card .fine{font-size:11.5px;color:var(--text-muted);margin-top:16px;line-height:1.6;opacity:.8;}
+
+  /* ---------- BUTTONS ---------- */
+  .btn{font-weight:600;font-size:15px;border:none;border-radius:var(--radius-pill);
+    padding:14px 24px;cursor:pointer;transition:transform .15s var(--ease),box-shadow .15s var(--ease),opacity .15s;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;}
+  .btn:hover{transform:translateY(-1px);}
+  .btn:active{transform:translateY(0) scale(.98);}
+  .btn-primary{background:var(--accent);color:var(--accent-text);box-shadow:0 8px 20px -6px rgba(255,138,61,.55);}
+  .btn:disabled{opacity:.45;cursor:default;transform:none;}
+  .icon-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-muted);
+    border-radius:var(--radius-pill);padding:9px 15px;font-size:13px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:6px;transition:border-color .15s,color .15s,transform .15s;}
+  .icon-btn:hover{color:var(--text);border-color:var(--text-muted);transform:translateY(-1px);}
+  .icon-btn svg{width:15px;height:15px;}
+  .icon-toggle{width:38px;height:38px;border-radius:var(--radius-pill);border:1px solid var(--border);
+    background:var(--surface);color:var(--text-muted);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;flex:0 0 auto;transition:border-color .15s,color .15s;}
+  .icon-toggle:hover{color:var(--accent);border-color:var(--accent);}
+  .icon-toggle svg{width:17px;height:17px;}
+
+  /* ---------- HEADER ---------- */
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;
+    border-bottom:1px solid var(--border);}
+  .logo{font-family:var(--font-display);font-weight:700;font-size:19px;letter-spacing:-.01em;}
+  .logo span{color:var(--accent);}
+  .header-right{display:flex;align-items:center;gap:10px;}
+  .status-pill{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);
+    border:1px solid var(--border);border-radius:var(--radius-pill);padding:6px 12px;
+    display:flex;align-items:center;gap:7px;letter-spacing:.02em;}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);transition:background .2s;}
+  .dot.live{background:var(--success);box-shadow:0 0 7px var(--success);}
+
+  /* ---------- AD SLOTS ---------- */
+  .ad-slot{width:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);
+    font-size:10.5px;font-family:var(--font-mono);letter-spacing:.1em;text-transform:uppercase;
+    border:1px dashed var(--border);border-radius:var(--radius-md);margin:12px auto;
+    min-height:54px;max-width:680px;opacity:.7;}
+
+  main{flex:1;display:flex;flex-direction:column;align-items:center;width:100%;max-width:680px;
+    margin:0 auto;padding:0 16px 16px;}
+
+  /* ---------- IDLE / HERO ---------- */
+  #idle{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;gap:30px;width:100%;}
+  .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--text-muted);}
+  .nodes{position:relative;width:230px;height:90px;}
+  .node{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;background:var(--accent);
+    transform:translateY(-50%);box-shadow:0 0 16px rgba(255,138,61,.6);
+    animation:bob 3.4s ease-in-out infinite;}
+  .node.a{left:8px;} .node.b{right:8px;animation-delay:.6s;}
+  .wire{position:absolute;top:50%;left:22px;right:22px;height:1px;border-top:1px dashed var(--border);
+    transform:translateY(-50%);}
+  .wire .pulse{position:absolute;top:-3px;left:0;width:7px;height:7px;border-radius:50%;
+    background:var(--accent);opacity:0;}
+  #idle.searching .pulse{animation:travel 1.5s linear infinite;opacity:1;}
+  @media (prefers-reduced-motion:no-preference){
+    @keyframes travel{0%{left:0%;opacity:0;}8%{opacity:1;}92%{opacity:1;}100%{left:100%;opacity:0;}}
+    @keyframes bob{0%,100%{transform:translateY(-50%);}50%{transform:translateY(calc(-50% - 4px));}}
+  }
+  #idle h1{font-family:var(--font-display);font-weight:700;font-size:clamp(26px,6vw,36px);
+    margin:0;letter-spacing:-.015em;}
+  #idle p.sub{color:var(--text-muted);font-size:13.5px;margin:6px 0 0;font-family:var(--font-mono);}
+
+  /* ---------- CHAT ---------- */
+  #chat{display:none;flex:1;flex-direction:column;width:100%;min-height:0;position:relative;}
+  #chat.active{display:flex;}
+  #chat.flash::before{
+    content:"";position:absolute;top:0;left:50%;width:1px;height:1px;
+    background:radial-gradient(circle, rgba(255,138,61,.5), transparent 70%);
+    animation:burst .6s ease-out forwards;pointer-events:none;
+  }
+  @media (prefers-reduced-motion:no-preference){
+    @keyframes burst{0%{width:1px;height:1px;opacity:1;}100%{width:600px;height:600px;opacity:0;
+      transform:translate(-50%,-40%);}}
+  }
+  .chat-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 4px;
+    border-bottom:1px solid var(--border);min-height:24px;}
+  .chat-bar .who{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);
+    display:flex;align-items:center;gap:7px;}
+  .chat-bar .who .dot{background:var(--success);box-shadow:0 0 6px var(--success);}
+  .chat-actions{display:flex;gap:8px;}
+
+  #messages{flex:1;overflow-y:auto;padding:18px 2px;display:flex;flex-direction:column;gap:9px;}
+  .msg{max-width:76%;padding:10px 14px;border-radius:18px;font-size:14.5px;line-height:1.45;
+    animation:rise .25s var(--ease);}
+  @media (prefers-reduced-motion:no-preference){
+    @keyframes rise{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  }
+  .msg.me{align-self:flex-end;background:var(--accent-soft);color:var(--accent-soft-text);
+    border-bottom-right-radius:5px;}
+  .msg.them{align-self:flex-start;background:var(--surface-2);border-bottom-left-radius:5px;}
+  .msg.sys{align-self:center;color:var(--text-muted);font-size:11.5px;font-family:var(--font-mono);
+    background:none;padding:4px 10px;letter-spacing:.02em;}
+
+  .composer{display:flex;gap:10px;padding:12px 2px 4px;align-items:center;}
+  .composer input{flex:1;background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius-pill);padding:14px 18px;color:var(--text);font-size:15px;
+    outline:none;transition:border-color .15s;}
+  .composer input:focus{border-color:var(--accent);}
+  .send-btn{width:46px;height:46px;border-radius:50%;background:var(--accent);color:var(--accent-text);
+    border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;
+    transition:transform .15s,opacity .15s;}
+  .send-btn:hover{transform:scale(1.05);}
+  .send-btn:active{transform:scale(.95);}
+  .send-btn svg{width:19px;height:19px;}
+
+  footer{text-align:center;padding:16px;font-size:11px;color:var(--text-muted);
+    font-family:var(--font-mono);letter-spacing:.02em;opacity:.75;}
+  footer a{color:var(--text-muted);}
+  footer a:hover{color:var(--accent);}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gate-card">
+    <div class="mark">spar<span>k</span>s</div>
+    <h2>Before you spark</h2>
+    <p>Sparks connects you with a random stranger for anonymous text chat. Nothing is saved once you leave. Don't share personal info. Use the report button for anything that crosses a line.</p>
+    <button class="btn btn-primary" id="gate-accept" style="width:100%;">I'm 18+ — let's go</button>
+    <div class="fine">By continuing you confirm you're 18 or older and agree this is an unmoderated, ephemeral, public chat at your own risk.</div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">spar<span>k</span>s</div>
+  <div class="header-right">
+    <div class="status-pill"><span class="dot" id="conn-dot"></span><span id="conn-text">connecting…</span></div>
+    <button class="icon-toggle" id="theme-toggle" aria-label="Toggle theme">
+      <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+    </button>
+  </div>
+</header>
+
+<!-- BEGIN AADS AD UNIT 2444750 -->
+
+<div id="frame" style="width: 728px;margin: auto;z-index: 99998;height: auto">
+          <iframe data-aa='2444750' src='//ad.a-ads.com/2444750/?size=728x90'
+                            style='border:0; padding:0; width:728px; height:90px; overflow:hidden;display: block;margin: auto'></iframe>
+        </div>
+
+<!-- END AADS AD UNIT 2444750 -->
+
+<main>
+  <div id="idle">
+    <div class="eyebrow">anonymous · text only · no sign-up</div>
+    <div class="nodes">
+      <div class="node a"></div>
+      <div class="wire"><div class="pulse"></div></div>
+      <div class="node b"></div>
+    </div>
+    <div>
+      <h1 id="idle-title">find a stranger</h1>
+      <p class="sub" id="idle-sub">one tap. no profile. no history.</p>
+    </div>
+    <button class="btn btn-primary" id="find-btn" disabled>Start chatting</button>
+  </div>
+
+  <div id="chat">
+    <div class="chat-bar">
+      <div class="who"><span class="dot"></span><span id="chat-status-text">connected to a stranger</span></div>
+      <div class="chat-actions">
+        <button class="icon-btn" id="skip-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          Skip
+        </button>
+        <button class="icon-btn" id="report-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          Report
+        </button>
+      </div>
+    </div>
+    <div id="messages"></div>
+    <div class="composer">
+      <input type="text" id="msg-input" placeholder="Say something…" maxlength="500" autocomplete="off">
+      <button class="send-btn" id="send-btn" aria-label="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</main>
+
+<!-- BEGIN AADS AD UNIT 2444750 -->
+
+<div id="frame" style="width: 728px;margin: auto;z-index: 99998;height: auto">
+          <iframe data-aa='2444750' src='//ad.a-ads.com/2444750/?size=728x90'
+                            style='border:0; padding:0; width:728px; height:90px; overflow:hidden;display: block;margin: auto'></iframe>
+        </div>
+
+<!-- END AADS AD UNIT 2444750 -->
+
+<footer>
+  no sign up · no login · no backend · nothing saved after you leave ·
+  <a href="#" id="rules-link">community rules</a>
+</footer>
+
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script>
+// ============================================================
+// SPARKS — fully backend-less.
+// Matching + chat run over a free public MQTT broker (no account).
+// Reports go to ntfy.sh (free push notifications, no account).
+// CHANGE THIS to your own random string:
+// ============================================================
+const REPORT_TOPIC = "sayand";
+const NS = "sparksapp-v1";
+
+const $ = (id) => document.getElementById(id);
+const myId = crypto.randomUUID();
+
+// ---------------- THEME ----------------
+const SUN = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>';
+const MOON = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+function paintThemeIcon(){
+  const theme = document.documentElement.getAttribute("data-theme");
+  $("theme-icon").innerHTML = theme === "dark" ? SUN : MOON;
+}
+paintThemeIcon();
+$("theme-toggle").addEventListener("click", ()=>{
+  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("sparks-theme", next);
+  paintThemeIcon();
+});
+
+let status = "idle"; // idle | waiting | proposing | chatting
+let target = null;
+let currentRoom = null;
+let candidates = new Map();
+let heartbeatTimer = null, pollTimer = null, proposeTimeout = null, partnerPingTimer = null, lastPartnerSeen = 0;
+let typingResetTimer = null;
+let lastMessages = [];
+
+const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
+  clientId: "sparks_" + myId,
+  reconnectPeriod: 2000
+});
+
+client.on("connect", () => {
+  $("conn-text").textContent = "ready";
+  $("conn-dot").classList.add("live");
+  $("find-btn").disabled = false;
+  client.subscribe(`${NS}/lobby`);
+});
+client.on("reconnect", () => { $("conn-text").textContent = "reconnecting…"; $("conn-dot").classList.remove("live"); });
+client.on("close", () => { $("conn-text").textContent = "offline"; $("conn-dot").classList.remove("live"); });
+
+client.on("message", (topic, payloadBuf) => {
+  let msg;
+  try { msg = JSON.parse(payloadBuf.toString()); } catch (e) { return; }
+
+  if (topic === `${NS}/lobby`) {
+    if (msg.id && msg.id !== myId) candidates.set(msg.id, Date.now());
+    return;
+  }
+  if (currentRoom && topic === `${NS}/room/${currentRoom}/signal`) { handleSignal(msg); return; }
+  if (currentRoom && topic === `${NS}/room/${currentRoom}/chat`) {
+    if (msg.type === "ping") { lastPartnerSeen = Date.now(); return; }
+    if (msg.type === "bye") { onPartnerLeft(); return; }
+    if (msg.type === "typing" && msg.from !== myId) {
+      lastPartnerSeen = Date.now();
+      $("chat-status-text").textContent = "stranger is typing…";
+      clearTimeout(typingResetTimer);
+      typingResetTimer = setTimeout(()=>{ $("chat-status-text").textContent = "connected to a stranger"; }, 2200);
+      return;
+    }
+    if (msg.type === "msg" && msg.from !== myId) {
+      lastPartnerSeen = Date.now();
+      pushMsg(msg.text, "them");
+      lastMessages.push({ from: "them", text: msg.text });
+    }
+  }
+});
+
+// ---------------- SAFETY FILTER ----------------
+const BLOCK_TERMS = ["nude","naked pic","send pics","sext","cybersex"];
+const AGE_SIGNAL_TERMS = ["13","14","15","16","middle school","elementary","minor","underage","kid","child"];
+const SEXUAL_TERMS = ["sex","nude","naked","porn","nsfw"];
+function checkMessage(text){
+  const t = text.toLowerCase();
+  const hasAge = AGE_SIGNAL_TERMS.some(w => t.includes(w));
+  const hasSexual = SEXUAL_TERMS.some(w => t.includes(w));
+  if (hasAge && hasSexual) return "severe";
+  if (BLOCK_TERMS.some(w => t.includes(w))) return "blocked";
+  return "ok";
+}
+function sendReport(reason, autoFlag){
+  const body = `[${autoFlag ? "AUTO" : "MANUAL"}] room=${currentRoom || "-"} reason=${reason}\n` +
+    lastMessages.slice(-10).map(m => `${m.from}: ${m.text}`).join("\n");
+  fetch(`https://ntfy.sh/${REPORT_TOPIC}`, { method: "POST", headers: { "Title": "Sparks report" }, body }).catch(()=>{});
+}
+
+// ---------------- MATCHMAKING ----------------
+function findMatch(){
+  status = "waiting";
+  $("idle-title").textContent = "searching…";
+  $("idle-sub").textContent = "looking for someone to spark with";
+  $("idle").classList.add("searching");
+  $("find-btn").disabled = true;
+  candidates.clear();
+
+  heartbeatTimer = setInterval(()=>{
+    if (status === "waiting") client.publish(`${NS}/lobby`, JSON.stringify({ id: myId, ts: Date.now() }));
+  }, 2000);
+  client.publish(`${NS}/lobby`, JSON.stringify({ id: myId, ts: Date.now() }));
+  pollTimer = setInterval(tryPair, 1500);
+}
+
+function tryPair(){
+  if (status !== "waiting") return;
+  const now = Date.now();
+  for (const [id, ts] of candidates) if (now - ts > 6000) candidates.delete(id);
+  if (candidates.size === 0) return;
+
+  const best = [...candidates.keys()].sort()[0];
+  target = best;
+  currentRoom = [myId, best].sort().join("-");
+  status = "proposing";
+  client.subscribe(`${NS}/room/${currentRoom}/signal`);
+  client.publish(`${NS}/room/${currentRoom}/signal`, JSON.stringify({ type:"propose", from: myId, to: target }));
+
+  proposeTimeout = setTimeout(()=>{
+    if (status === "proposing"){
+      client.unsubscribe(`${NS}/room/${currentRoom}/signal`);
+      status = "waiting"; target = null; currentRoom = null;
+    }
+  }, 3000);
+}
+
+function handleSignal(msg){
+  if (msg.type === "propose" && msg.to === myId && (status === "waiting" || (status === "proposing" && target === msg.from))){
+    client.publish(`${NS}/room/${currentRoom}/signal`, JSON.stringify({ type:"accept", from: myId, to: msg.from }));
+    enterRoom();
+  } else if (msg.type === "accept" && msg.to === myId && status === "proposing" && msg.from === target){
+    clearTimeout(proposeTimeout);
+    enterRoom();
+  }
+}
+
+function enterRoom(){
+  clearInterval(heartbeatTimer); clearInterval(pollTimer); clearTimeout(proposeTimeout);
+  client.unsubscribe(`${NS}/lobby`);
+  client.unsubscribe(`${NS}/room/${currentRoom}/signal`);
+  status = "chatting"; lastMessages = []; lastPartnerSeen = Date.now();
+
+  client.subscribe(`${NS}/room/${currentRoom}/chat`);
+  $("idle").style.display = "none";
+  $("chat").classList.add("active", "flash");
+  setTimeout(()=>$("chat").classList.remove("flash"), 650);
+  $("messages").innerHTML = "";
+  $("chat-status-text").textContent = "connected to a stranger";
+  pushSysMsg("you're connected — say hi");
+
+  partnerPingTimer = setInterval(()=>{
+    client.publish(`${N
