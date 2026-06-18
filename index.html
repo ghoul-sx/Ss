@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Sparks — talk to a stranger</title>
+<meta name="description" content="Free anonymous text chat. No sign up, no login, no backend.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0a0c;--panel:#13131a;--panel-2:#1b1b24;--line:#27272f;
+    --text:#ece9e4;--muted:#82828d;--spark:#ff8a3d;--spark-dim:#5c3a23;
+    --link:#5fd9c9;--danger:#e8556b;--radius:18px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;
+    display:flex;flex-direction:column;min-height:100vh;-webkit-font-smoothing:antialiased;}
+  a{color:var(--link);text-decoration:none;}
+  #gate{position:fixed;inset:0;background:rgba(8,8,10,.97);display:flex;align-items:center;
+    justify-content:center;z-index:100;padding:24px;}
+  #gate.hidden{display:none;}
+  .gate-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    max-width:380px;padding:28px 24px;text-align:center;}
+  .gate-card h2{font-family:'Space Grotesk',sans-serif;font-size:22px;margin:0 0 10px;}
+  .gate-card p{color:var(--muted);font-size:14px;line-height:1.5;margin:0 0 20px;}
+  .gate-card .fine{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.5;}
+  .btn{font-family:'Inter',sans-serif;font-weight:600;font-size:15px;border:none;
+    border-radius:999px;padding:13px 22px;cursor:pointer;transition:transform .12s ease, opacity .12s ease;}
+  .btn:active{transform:scale(.97);}
+  .btn-primary{background:var(--spark);color:#1a0f06;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;
+    border-bottom:1px solid var(--line);}
+  .logo{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:19px;}
+  .logo span{color:var(--spark);}
+  .status-pill{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);
+    border:1px solid var(--line);border-radius:999px;padding:5px 10px;display:flex;align-items:center;gap:6px;}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--muted);}
+  .dot.live{background:#5fd97f;box-shadow:0 0 6px #5fd97f;}
+  .ad-slot{width:100%;display:flex;align-items:center;justify-content:center;color:#4a4a52;
+    font-size:11px;font-family:'IBM Plex Mono',monospace;border:1px dashed var(--line);
+    border-radius:10px;margin:10px auto;min-height:50px;max-width:680px;}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;width:100%;max-width:680px;
+    margin:0 auto;padding:0 14px 14px;}
+  #idle{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;gap:26px;width:100%;}
+  .nodes{position:relative;width:220px;height:90px;}
+  .node{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:var(--spark);
+    transform:translateY(-50%);box-shadow:0 0 14px rgba(255,138,61,.7);}
+  .node.a{left:6px;} .node.b{right:6px;}
+  .wire{position:absolute;top:50%;left:20px;right:20px;height:1px;border-top:1px dashed var(--line);
+    transform:translateY(-50%);}
+  .wire .pulse{position:absolute;top:-3px;left:0;width:7px;height:7px;border-radius:50%;
+    background:var(--spark);opacity:0;}
+  #idle.searching .pulse{animation:travel 1.4s linear infinite;opacity:1;}
+  @keyframes travel{0%{left:0%;opacity:0;}8%{opacity:1;}92%{opacity:1;}100%{left:100%;opacity:0;}}
+  #idle h1{font-family:'Space Grotesk',sans-serif;font-size:26px;margin:0;}
+  #idle p.sub{color:var(--muted);font-size:14px;margin:0;font-family:'IBM Plex Mono',monospace;}
+  #chat{display:none;flex:1;flex-direction:column;width:100%;min-height:0;}
+  #chat.active{display:flex;}
+  .chat-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 4px;
+    border-bottom:1px solid var(--line);}
+  .chat-bar .who{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);}
+  .chat-actions{display:flex;gap:8px;}
+  .icon-btn{background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    border-radius:999px;padding:7px 13px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;}
+  #messages{flex:1;overflow-y:auto;padding:16px 2px;display:flex;flex-direction:column;gap:8px;}
+  .msg{max-width:78%;padding:9px 13px;border-radius:16px;font-size:14.5px;line-height:1.4;}
+  .msg.me{align-self:flex-end;background:var(--spark-dim);color:#ffe3c9;border-bottom-right-radius:5px;}
+  .msg.them{align-self:flex-start;background:var(--panel-2);border-bottom-left-radius:5px;}
+  .msg.sys{align-self:center;color:var(--muted);font-size:12px;font-family:'IBM Plex Mono',monospace;background:none;}
+  .composer{display:flex;gap:8px;padding:10px 2px 4px;}
+  .composer input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:999px;
+    padding:13px 16px;color:var(--text);font-size:15px;outline:none;}
+  .composer input:focus{border-color:var(--spark);}
+  footer{text-align:center;padding:14px;font-size:11px;color:#54545c;font-family:'IBM Plex Mono',monospace;}
+  footer a{color:#6f6f7a;}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gate-card">
+    <h2>Before you spark</h2>
+    <p>Sparks connects you with a random stranger for anonymous text chat. Nothing is saved once you leave. Don't share personal info. Use the report button for anything that crosses a line.</p>
+    <button class="btn btn-primary" id="gate-accept" style="width:100%;margin-bottom:10px;">I'm 18+ — let's go</button>
+    <div class="fine">By continuing you confirm you're 18 or older and agree this is an unmoderated, ephemeral, public chat at your own risk.</div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">spar<span>k</span>s</div>
+  <div class="status-pill"><span class="dot" id="conn-dot"></span><span id="conn-text">connecting…</span></div>
+</header>
+
+<div class="ad-slot" id="ad-top">ad space</div>
+
+<main>
+  <div id="idle">
+    <div class="nodes">
+      <div class="node a"></div>
+      <div class="wire"><div class="pulse"></div></div>
+      <div class="node b"></div>
+    </div>
+    <div>
+      <h1 id="idle-title">find a stranger</h1>
+      <p class="sub" id="idle-sub">one tap. no profile. no history.</p>
+    </div>
+    <button class="btn btn-primary" id="find-btn" disabled>Start chatting</button>
+  </div>
+
+  <div id="chat">
+    <div class="chat-bar">
+      <div class="who">connected to a stranger</div>
+      <div class="chat-actions">
+        <button class="icon-btn" id="skip-btn">Skip ↻</button>
+        <button class="icon-btn" id="report-btn">Report ⚑</button>
+      </div>
+    </div>
+    <div id="messages"></div>
+    <div class="composer">
+      <input type="text" id="msg-input" placeholder="Say something…" maxlength="500" autocomplete="off">
+      <button class="btn btn-primary" id="send-btn">Send</button>
+    </div>
+  </div>
+</main>
+
+<div class="ad-slot" id="ad-bottom">ad space</div>
+
+<footer>
+  no sign up · no login · no backend · nothing saved after you leave ·
+  <a href="#" id="rules-link">community rules</a>
+</footer>
+
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script>
+// ============================================================
+// SPARKS — fully backend-less.
+// Matching + chat run over a free public MQTT broker (no account).
+// Reports go to ntfy.sh (free push notifications, no account).
+// CHANGE THIS to your own random string so strangers can't guess your
+// report channel and so it's not the same as anyone else trying this demo:
+// ============================================================
+const REPORT_TOPIC = "sparksandsay";
+const NS = "sparksapp-v1"; // topic namespace, change if you want full isolation
+
+const $ = (id) => document.getElementById(id);
+const myId = crypto.randomUUID();
+
+let status = "idle"; // idle | waiting | proposing | chatting
+let target = null;
+let currentRoom = null;
+let candidates = new Map(); // id -> lastSeenTs
+let heartbeatTimer = null, pollTimer = null, proposeTimeout = null, partnerPingTimer = null, lastPartnerSeen = 0;
+let lastMessages = [];
+
+const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
+  clientId: "sparks_" + myId,
+  reconnectPeriod: 2000
+});
+
+client.on("connect", () => {
+  $("conn-text").textContent = "ready";
+  $("conn-dot").classList.add("live");
+  $("find-btn").disabled = false;
+  client.subscribe(`${NS}/lobby`);
+});
+client.on("reconnect", () => { $("conn-text").textContent = "reconnecting…"; $("conn-dot").classList.remove("live"); });
+client.on("close", () => { $("conn-text").textContent = "offline"; $("conn-dot").classList.remove("live"); });
+
+client.on("message", (topic, payloadBuf) => {
+  let msg;
+  try { msg = JSON.parse(payloadBuf.toString()); } catch (e) { return; }
+
+  if (topic === `${NS}/lobby`) {
+    if (msg.id && msg.id !== myId) candidates.set(msg.id, Date.now());
+    return;
+  }
+  if (currentRoom && topic === `${NS}/room/${currentRoom}/signal`) {
+    handleSignal(msg);
+    return;
+  }
+  if (currentRoom && topic === `${NS}/room/${currentRoom}/chat`) {
+    if (msg.type === "ping") { lastPartnerSeen = Date.now(); return; }
+    if (msg.type === "bye") { onPartnerLeft(); return; }
+    if (msg.type === "msg" && msg.from !== myId) {
+      lastPartnerSeen = Date.now();
+      pushMsg(msg.text, "them");
+      lastMessages.push({ from: "them", text: msg.text });
+    }
+  }
+});
+
+// ---------------- SAFETY FILTER ----------------
+const BLOCK_TERMS = ["nude","naked pic","send pics","sext","cybersex"];
+const AGE_SIGNAL_TERMS = ["13","14","15","16","middle school","elementary","minor","underage","kid","child"];
+const SEXUAL_TERMS = ["sex","nude","naked","porn","nsfw"];
+function checkMessage(text){
+  const t = text.toLowerCase();
+  const hasAge = AGE_SIGNAL_TERMS.some(w => t.includes(w));
+  const hasSexual = SEXUAL_TERMS.some(w => t.includes(w));
+  if (hasAge && hasSexual) return "severe";
+  if (BLOCK_TERMS.some(w => t.includes(w))) return "blocked";
+  return "ok";
+}
+function sendReport(reason, autoFlag){
+  const body = `[${autoFlag ? "AUTO" : "MANUAL"}] room=${currentRoom || "-"} reason=${reason}\n` +
+    lastMessages.slice(-10).map(m => `${m.from}: ${m.text}`).join("\n");
+  fetch(`https://ntfy.sh/${REPORT_TOPIC}`, {
+    method: "POST",
+    headers: { "Title": "Sparks report" },
+    body
+  }).catch(()=>{});
+}
+
+// ---------------- MATCHMAKING ----------------
+function findMatch(){
+  status = "waiting";
+  $("idle-title").textContent = "searching…";
+  $("idle-sub").textContent = "looking for someone to spark with";
+  $("idle").classList.add("searching");
+  $("find-btn").disabled = true;
+  candidates.clear();
+
+  heartbeatTimer = setInterval(()=>{
+    if (status === "waiting") client.publish(`${NS}/lobby`, JSON.stringify({ id: myId, ts: Date.now() }));
+  }, 2000);
+  client.publish(`${NS}/lobby`, JSON.stringify({ id: myId, ts: Date.now() }));
+
+  pollTimer = setInterval(tryPair, 1500);
+}
+
+function tryPair(){
+  if (status !== "waiting") return;
+  const now = Date.now();
+  for (const [id, ts] of candidates) if (now - ts > 6000) candidates.delete(id);
+  if (candidates.size === 0) return;
+
+  const best = [...candidates.keys()].sort()[0];
+  target = best;
+  currentRoom = [myId, best].sort().join("-");
+  status = "proposing";
+  client.subscribe(`${NS}/room/${currentRoom}/signal`);
+  client.publish(`${NS}/room/${currentRoom}/signal`, JSON.stringify({ type:"propose", from: myId, to: target }));
+
+  proposeTimeout = setTimeout(()=>{
+    if (status === "proposing"){
+      client.unsubscribe(`${NS}/room/${currentRoom}/signal`);
+      status = "waiting"; target = null; currentRoom = null;
+    }
+  }, 3000);
+}
+
+function handleSignal(msg){
+  if (msg.type === "propose" && msg.to === myId && (status === "waiting" || (status === "proposing" && target === msg.from))){
+    client.publish(`${NS}/room/${currentRoom}/signal`, JSON.stringify({ type:"accept", from: myId, to: msg.from }));
+    enterRoom();
+  } else if (msg.type === "accept" && msg.to === myId && status === "proposing" && msg.from === target){
+    clearTimeout(proposeTimeout);
+    enterRoom();
+  }
+}
+
+function enterRoom(){
+  clearInterval(heartbeatTimer); clearInterval(pollTimer); clearTimeout(proposeTimeout);
+  client.unsubscribe(`${NS}/lobby`);
+  client.unsubscribe(`${NS}/room/${currentRoom}/signal`);
+  status = "chatting"; lastMessages = []; lastPartnerSeen = Date.now();
+
+  client.subscribe(`${NS}/room/${currentRoom}/chat`);
+  $("idle").style.display = "none";
+  $("chat").classList.add("active");
+  $("messages").innerHTML = "";
+  pushSysMsg("you're connected — say hi");
+
+  partnerPingTimer = setInterval(()=>{
+    client.publish(`${NS}/room/${currentRoom}/chat`, JSON.stringify({ type:"ping", from: myId }));
+    if (Date.now() - lastPartnerSeen > 12000) onPartnerLeft();
+  }, 4000);
+}
+
+function onPartnerLeft(){
+  pushSysMsg("stranger disconnected");
+  setTimeout(()=>{ leaveRoomUI(); findMatch(); }, 900);
+}
+
+function pushMsg(text, who){
+  const div = document.createElement("div");
+  div.className = `msg ${who}`;
+  div.textContent = text;
+  $("messages").appendChild(div);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+function pushSysMsg(text){
+  const div = document.createElement("div");
+  div.className = "msg sys";
+  div.textContent = text;
+  $("messages").appendChild(div);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+
+function sendMessage(){
+  const input = $("msg-input");
+  const text = input.value.trim();
+  if (!text || status !== "chatting") return;
+
+  const verdict = checkMessage(text);
+  if (verdict === "blocked"){ pushSysMsg("message blocked — keep it text-only and respectful"); input.value = ""; return; }
+  if (verdict === "severe"){
+    sendReport("auto-flag: sexual content + age signal", true);
+    pushSysMsg("this chat has been ended and reported for safety reasons");
+    input.value = "";
+    endRoom(); return;
+  }
+
+  client.publish(`${NS}/room/${currentRoom}/chat`, JSON.stringify({ type:"msg", from: myId, text }));
+  pushMsg(text, "me");
+  lastMessages.push({ from: "me", text });
+  input.value = "";
+}
+
+function endRoom(){
+  if (currentRoom) client.publish(`${NS}/room/${currentRoom}/chat`, JSON.stringify({ type:"bye", from: myId }));
+  leaveRoomUI();
+}
+
+function leaveRoomUI(){
+  if (currentRoom) client.unsubscribe(`${NS}/room/${currentRoom}/chat`);
+  clearInterval(partnerPingTimer);
+  currentRoom = null; target = null; status = "idle";
+  $("chat").classList.remove("active");
+  $("idle").style.display = "flex";
+  $("idle").classList.remove("searching");
+  $("idle-title").textContent = "find a stranger";
+  $("idle-sub").textContent = "one tap. no profile. no history.";
+  $("find-btn").disabled = false;
+}
+
+// ---------------- UI WIRING ----------------
+$("gate-accept").addEventListener("click", ()=>{
+  $("gate").classList.add("hidden");
+  sessionStorage.setItem("sparks_gate_ok","1");
+});
+if (sessionStorage.getItem("sparks_gate_ok") === "1") $("gate").classList.add("hidden");
+
+$("find-btn").addEventListener("click", findMatch);
+$("send-btn").addEventListener("click", sendMessage);
+$("msg-input").addEventListener("keydown", (e)=>{ if (e.key==="Enter") sendMessage(); });
+$("skip-btn").addEventListener("click", ()=>{ endRoom(); findMatch(); });
+$("report-btn").addEventListener("click", ()=>{
+  const reason = prompt("What happened? (goes only to the site owner)") || "unspecified";
+  sendReport(reason, false);
+  alert("Reported. Ending this chat for your safety.");
+  endRoom();
+});
+
+window.addEventListener("beforeunload", ()=>{
+  if (currentRoom) client.publish(`${NS}/room/${currentRoom}/chat`, JSON.stringify({ type:"bye", from: myId }));
+});
+</script>
+</body>
+</html>
